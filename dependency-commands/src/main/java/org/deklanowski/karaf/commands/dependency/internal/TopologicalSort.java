@@ -1,4 +1,4 @@
-package org.deklanowski.karaf.features.internal;
+package org.deklanowski.karaf.commands.dependency.internal;
 
 import com.google.common.graph.Graph;
 import com.google.common.graph.GraphBuilder;
