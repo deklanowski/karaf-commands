@@ -25,11 +25,12 @@ public class graph implements Action {
     @Reference
     private FeaturesService featuresService;
 
-    @Option(name = "-v", aliases = {"--version"}, description = "Feature version")
-    private String version;
-
     @Argument(name = "name", description = "Feature name", required = true)
     private String name;
+
+
+    @Argument(index = 1, name = "version", description = "The version of the feature", required = false, multiValued = false)
+    private String version;
 
 
     private final MutableGraph<String> directedGraph = GraphBuilder.directed().allowsSelfLoops(false).build();

@@ -1,2 +1,2 @@
-# karaf-dependency-commands
-Karaf console commands to display feature dependency information in useful ways.
+# karaf-commands
+A compendium of useful karaf commands for Apache Karaf 4.x
