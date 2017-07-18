@@ -30,16 +30,14 @@ public class GraphCommandTest {
     private Feature b = new org.apache.karaf.features.internal.model.Feature("b", "1.0.0");
 
 
-    private List<Dependency> rootDependencies = new ArrayList<Dependency>()
-    {
+    private List<Dependency> rootDependencies = new ArrayList<Dependency>() {
         {
             add(new org.apache.karaf.features.internal.model.Dependency("a", "1.0.0"));
         }
     };
 
 
-    private List<Dependency> aDependencies = new ArrayList<Dependency>()
-    {
+    private List<Dependency> aDependencies = new ArrayList<Dependency>() {
         {
             add(new org.apache.karaf.features.internal.model.Dependency("b", "1.0.0"));
         }
@@ -50,16 +48,25 @@ public class GraphCommandTest {
     public void setUp() throws Exception {
 
 
-        Field field = ReflectionUtils.findField(org.apache.karaf.features.internal.model.Feature.class,"feature");
+        Field field = ReflectionUtils.findField(org.apache.karaf.features.internal.model.Feature.class, "feature");
 
         ReflectionUtils.makeAccessible(field);
 
-        ReflectionUtils.setField(field,root,rootDependencies);
+        ReflectionUtils.setField(field, root, rootDependencies);
 
-        ReflectionUtils.setField(field,a,aDependencies);
+        ReflectionUtils.setField(field, a, aDependencies);
 
-        ReflectionUtils.setField(field,b,Collections.emptyList());
+        ReflectionUtils.setField(field, b, Collections.emptyList());
 
+        field = ReflectionUtils.findField(org.apache.karaf.features.internal.model.Feature.class, "repositoryUrl");
+
+        ReflectionUtils.makeAccessible(field);
+
+        ReflectionUtils.setField(field, root, "root:url");
+
+        ReflectionUtils.setField(field, a, "a:url");
+
+        ReflectionUtils.setField(field, b, "b:url");
 
     }
 
@@ -72,6 +79,12 @@ public class GraphCommandTest {
         when(service.getFeatures("a", "1.0.0")).thenReturn(new Feature[]{a});
 
         when(service.getFeatures("b", "1.0.0")).thenReturn(new Feature[]{b});
+
+        when(service.getFeature("root", "1.0.0")).thenReturn(root);
+
+        when(service.getFeature("a", "1.0.0")).thenReturn(a);
+
+        when(service.getFeature("b", "1.0.0")).thenReturn(b);
 
 
         graph command = new graph();
