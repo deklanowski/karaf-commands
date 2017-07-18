@@ -29,6 +29,18 @@ public class DependencySorter<T> {
      */
     private Map<Integer, Set<T>> levelMap = new HashMap<>();
 
+    /**
+     * Chattiness level
+     */
+    private final boolean verbose;
+
+    public DependencySorter() {
+        this.verbose = false;
+    }
+
+    public DependencySorter(boolean verbose) {
+        this.verbose = verbose;
+    }
 
     /**
      * @param graph dependency graph, must be a DAG
@@ -66,7 +78,11 @@ public class DependencySorter<T> {
         }
 
         queue.add(null); // this marks end of level 1, which contains all starter nodes
-        System.out.printf("Level %d queue=%s\n",level,queue);
+
+        if (verbose) {
+            System.out.printf("Level %d queue=%s\n", level, queue);
+        }
+
         addToLevelMap(level, queue);
 
         while (!queue.isEmpty()) {
@@ -76,11 +92,15 @@ public class DependencySorter<T> {
             if (node == null) {
                 queue.add(null);
                 if (queue.peek() == null) {
-                    System.out.println("Two consecutive nulls encountered, all nodes visited.");
+                    if (verbose) {
+                        System.out.println("Two consecutive nulls encountered, all nodes visited.");
+                    }
                     break;
                 } else {
                     level++;
-                    System.out.printf("Level %d queue=%s\n",level,queue);
+                    if (verbose) {
+                        System.out.printf("Level %d queue=%s\n", level, queue);
+                    }
                     addToLevelMap(level, queue);
                     continue;
                 }
@@ -89,7 +109,9 @@ public class DependencySorter<T> {
 
             Set<T> successors = graph.successors(node);
 
-            System.out.printf("node:%s successors :%s\n",node,successors);
+            if (verbose) {
+                System.out.printf("node:%s successors :%s\n", node, successors);
+            }
 
             for (T successor : successors) {
 
@@ -98,7 +120,9 @@ public class DependencySorter<T> {
                 nodeDegree.put(successor, (degree == 0 ? 0 : degree-1));
 
                 if (shouldAddToQueue(degree)) {
-                    System.out.printf("Adding %s to queue and output\n",successor);
+                    if (verbose) {
+                        System.out.printf("Adding %s to queue and output\n", successor);
+                    }
                     queue.offer(successor);
                     result.add(successor);
                 }
@@ -159,7 +183,7 @@ public class DependencySorter<T> {
         g.putEdge(11, 6);
 
 
-        DependencySorter<Integer> dependencySorter = new DependencySorter<>();
+        DependencySorter<Integer> dependencySorter = new DependencySorter<>(true);
         List<Integer> list = dependencySorter.sort(g);
 
         System.out.println("Topologically sorted, for dependency build order reverse the list");

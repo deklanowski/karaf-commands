@@ -105,6 +105,12 @@ public class GraphCommandTest {
 
     }
 
+    @Test
+    public void name() throws Exception {
+        String url = "mvn:com.ipfli.ipf.target-manager/features/4.1.5-SNAPSHOT/xml/features";
+
+        System.out.println(url.replace("mvn:","").replace("/xml/features",""));
+    }
 
     @Test(expected = IllegalStateException.class)
     public void test_detect_cycle_graph_command() throws Exception {
