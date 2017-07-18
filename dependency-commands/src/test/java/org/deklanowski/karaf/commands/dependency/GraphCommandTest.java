@@ -44,6 +44,13 @@ public class GraphCommandTest {
     };
 
 
+    private List<Dependency> bDependencies = new ArrayList<Dependency>() {
+        {
+            add(new org.apache.karaf.features.internal.model.Dependency("root", "1.0.0"));
+        }
+    };
+
+
     @Before
     public void setUp() throws Exception {
 
@@ -56,7 +63,6 @@ public class GraphCommandTest {
 
         ReflectionUtils.setField(field, a, aDependencies);
 
-        ReflectionUtils.setField(field, b, Collections.emptyList());
 
         field = ReflectionUtils.findField(org.apache.karaf.features.internal.model.Feature.class, "repositoryUrl");
 
@@ -67,12 +73,6 @@ public class GraphCommandTest {
         ReflectionUtils.setField(field, a, "a:url");
 
         ReflectionUtils.setField(field, b, "b:url");
-
-    }
-
-    @Test
-    public void test_graph_command() throws Exception {
-
 
         when(service.getFeatures("root", "1.0.0")).thenReturn(new Feature[]{root});
 
@@ -86,6 +86,32 @@ public class GraphCommandTest {
 
         when(service.getFeature("b", "1.0.0")).thenReturn(b);
 
+    }
+
+    @Test
+    public void test_graph_command() throws Exception {
+
+        // b has no dependencies for this test
+        Field field = ReflectionUtils.findField(org.apache.karaf.features.internal.model.Feature.class, "feature");
+        ReflectionUtils.setField(field, b, Collections.emptyList());
+
+
+        graph command = new graph();
+        command.setFeaturesService(service);
+        command.setName(root.getName());
+        command.setVersion(root.getVersion());
+
+        command.execute();
+
+    }
+
+
+    @Test(expected = IllegalStateException.class)
+    public void test_detect_cycle_graph_command() throws Exception {
+
+        // b contains a cycle i.e., it depends on root
+        Field field = ReflectionUtils.findField(org.apache.karaf.features.internal.model.Feature.class, "feature");
+        ReflectionUtils.setField(field, b, bDependencies);
 
         graph command = new graph();
         command.setFeaturesService(service);

@@ -47,10 +47,10 @@ public class graph implements Action {
         final List<String> list = dependencySorter.sort(repoGraph);
 
 
-        System.out.println("\n\nTopological ordering\n\n");
-        for (String s : list) {
-            System.out.println(s);
-        }
+//        System.out.println("\n\nTopological ordering\n\n");
+//        for (String s : list) {
+//            System.out.println(s);
+//        }
 
 
         for (Map.Entry<Integer,Set<String>> entry : dependencySorter.getLevelMap().entrySet()) {
@@ -72,55 +72,6 @@ public class graph implements Action {
             System.out.printf("\t\"%s\" -> \"%s\";\n",pair.source(), pair.target());
         }
         System.out.println("}");
-    }
-
-    /**
-     * @param graph: a DAG
-     * @return topological ordering starting with most dependent node.
-     */
-    private <T> List<T> topSort(MutableGraph<T> graph) {
-
-        List<T> result = new ArrayList<>();
-
-        Queue<T> queue = new LinkedList<>();
-
-        Map<T, Integer> nodeDegree = new HashMap<>();
-
-        for (T node : graph.nodes()) {
-            int degree = graph.inDegree(node);
-            nodeDegree.put(node, degree);
-            if (degree == 0) {
-                queue.offer(node);
-                result.add(node);
-            }
-        }
-
-        while (!queue.isEmpty()) {
-
-            System.out.printf("Queue: %s\n\n",queue);
-
-            T node = queue.poll();
-
-            Set<T> successors = graph.successors(node);
-
-          //  System.out.printf("node:%s adjacent nodes:%s\n",node,successors);
-
-            for (T successor : successors) {
-
-                int inDegree = nodeDegree.get(successor);
-
-            //    System.out.printf("node:%s inDegree:%d\n",successor,inDegree);
-
-                nodeDegree.put(successor, (inDegree == 0 ? 0 : inDegree-1));
-
-                if ((inDegree - 1) == 0) {
-                    queue.offer(successor);
-                    result.add(successor);
-                }
-            }
-        }
-
-        return result;
     }
 
 
@@ -159,7 +110,7 @@ public class graph implements Action {
      * @param service        feature admin service
      * @param featureName    root feature
      * @param featureVersion root feature version
-     * @throws Exception if something goes wrong
+     * @throws Exception if cycles are detected while building the graph(s)
      */
     private void buildFeatureGraph(FeaturesService service, String featureName, String featureVersion) throws Exception {
 
@@ -175,7 +126,7 @@ public class graph implements Action {
                 Feature df = service.getFeature(toName, dependency.getVersion());
 
                 if (df == null) {
-                    throw new IllegalStateException(String.format("Could not resolve feature for %s",dependency));
+                    throw new IllegalStateException(String.format("Could not resolve feature for %s, you might need to update your local maven repository",dependency));
                 }
 
                 String toRepo = df.getRepositoryUrl();
@@ -184,18 +135,15 @@ public class graph implements Action {
 
                 featureGraph.putEdge(from, to);
                 if (Graphs.hasCycle(featureGraph)) {
-                    System.out.printf("Circular dependency detected while adding edge '%s' -> '%s', aborting\n", featureName, toName);
-                    return;
+                    throw new IllegalStateException(String.format("Circular dependency detected while adding edge '%s' -> '%s', aborting\n", featureName, toName));
                 }
 
                 if (!fromRepo.equals(toRepo)) {
                     repoGraph.putEdge(fromRepo, toRepo);
                     if (Graphs.hasCycle(repoGraph)) {
-                        System.out.printf("Circular dependency detected while adding edge '%s' -> '%s', aborting\n", featureName, toName);
-                        return;
+                        throw new IllegalStateException(String.format("Circular dependency detected while adding edge '%s' -> '%s', aborting\n", fromRepo, toRepo));
                     }
                 }
-
 
                 buildFeatureGraph(service, toName, dependency.getVersion());
             }
