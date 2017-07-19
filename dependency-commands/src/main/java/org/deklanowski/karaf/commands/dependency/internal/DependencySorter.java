@@ -132,6 +132,12 @@ public class DependencySorter<T> {
         }
 
 
+
+
+
+        // find all nodes with no successors, these can be moved to the bottom-most level
+        // regardless of what their original computed level is.
+        //
         Set<T> bottomFeeders = new HashSet<>();
 
         for (Map.Entry<Integer, Set<T>> entry : levelMap.entrySet()) {
@@ -143,10 +149,11 @@ public class DependencySorter<T> {
                     nodeIter.remove();
                 }
             }
-
         }
 
-        System.out.println("Bottom feeders: " + bottomFeeders);
+        if (verbose) {
+            System.out.println("Bottom feeders: " + bottomFeeders);
+        }
 
         bottomFeeders.addAll(levelMap.get(levelMap.size()));
         levelMap.put(levelMap.size(), bottomFeeders);
@@ -164,17 +171,6 @@ public class DependencySorter<T> {
         Set<T> nodes = new HashSet<>(queue);
         nodes.remove(null); // remove our marker nulls
         levelMap.put(level, nodes);
-    }
-
-
-    /**
-     * Call this directly after {@link #sort(Graph)} to get level view of
-     * nodes.
-     *
-     * @return level to nodes map
-     */
-    public Map<Integer, Set<T>> getLevelMap() {
-        return this.levelMap;
     }
 
 
@@ -226,6 +222,7 @@ public class DependencySorter<T> {
         // group levels in a subgraph
         for (Integer level : this.levelMap.keySet()) {
             System.out.printf("\tsubgraph cluster_%d { label=\"Level %d\"; shape=box; style=rounded; node [style=rounded];\n", level, level);
+
             Set<T> levelNodes = (Set<T>)levelMap.get(level);
             for (T node : levelNodes) {
                 System.out.printf("\"%s\" ", node);
@@ -276,9 +273,7 @@ public class DependencySorter<T> {
 
         System.out.println("\nLevel Map:");
 
-        for (Map.Entry<Integer, Set<Integer>> entry : dependencySorter.getLevelMap().entrySet()) {
-            System.out.printf("%d -> %s\n", entry.getKey(), entry.getValue());
-        }
+        dependencySorter.displayDependencyLevels();
     }
 
 
