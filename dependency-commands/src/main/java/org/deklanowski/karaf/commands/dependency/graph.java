@@ -16,9 +16,6 @@ import org.apache.karaf.shell.api.action.lifecycle.Service;
 import org.deklanowski.karaf.commands.dependency.internal.DependencySorter;
 
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.atomic.AtomicLong;
 
 @Command(scope = "dependency", name = "graph", description = "Generates a dependency levelized output of feature repositories for the specified feature")
 @Service
@@ -42,6 +39,10 @@ public class graph implements Action {
     @Option(name = "--verbose", description = "Blah blah blah")
     private boolean verbose;
 
+    @Option(name = "--nodePattern", description = "Simple string matcher for node names for the application of styling actions in DOT output")
+    private String nodePattern;
+
+
     private final MutableGraph<Node> featureGraph = GraphBuilder.directed().allowsSelfLoops(false).build();
 
     private final MutableGraph<String> repoGraph = GraphBuilder.directed().allowsSelfLoops(true).build();
@@ -55,16 +56,14 @@ public class graph implements Action {
             System.out.printf("Computing feature graph for '%s' '%s':\n", name, (version == null ? "0.0.0" : version));
         }
 
-
         buildFeatureGraph(featuresService, name, version);
-
 
         if (feature) {
             final DependencySorter<Node> sorter = new DependencySorter<>(verbose);
             final List<Node> list = sorter.sort(featureGraph);
 
             if (dot) {
-                sorter.generateDotOutput(featureGraph);
+                sorter.generateDotOutput(featureGraph, nodePattern );
             } else {
                 sorter.displayDependencyLevels();
             }
@@ -74,17 +73,14 @@ public class graph implements Action {
             final List<String> list = sorter.sort(repoGraph);
 
             if (dot) {
-                sorter.generateDotOutput(repoGraph);
+                sorter.generateDotOutput(repoGraph, nodePattern );
             } else {
                 sorter.displayDependencyLevels();
             }
         }
 
-
         return null;
-
     }
-
 
 
 

@@ -35,6 +35,7 @@ public class DependencySorter<T> {
      */
     private final boolean verbose;
 
+
     public DependencySorter() {
         this.verbose = false;
     }
@@ -197,12 +198,12 @@ public class DependencySorter<T> {
 
     /**
      * Simple DOT output for visualisation
-     *
-     * @param <T>   node type
+     *  @param <T>   node type
      * @param graph the graph instance
+     * @param nodePattern a simple filter to identify certain nodes for styling actions
      */
     @SuppressWarnings("unchecked")
-    public <T> void generateDotOutput(Graph<T> graph) {
+    public <T> void generateDotOutput(Graph<T> graph, String nodePattern) {
 
         System.out.println("digraph G {\ngraph [style=\"rounded, filled\", fontsize=10];\nrankdir=LR;\nnode [shape=box, style=\"rounded,filled\"]\n\n");
 
@@ -215,7 +216,7 @@ public class DependencySorter<T> {
 
         nodes
                 .stream()
-                .filter(node -> node.toString().contains("com.ipfli"))
+                .filter(node -> node.toString().contains(nodePattern))
                 .forEach(node -> System.out.printf("\"%s\" [ color=darkseagreen ];\n", node));
 
 
@@ -270,7 +271,7 @@ public class DependencySorter<T> {
         System.out.println();
 
 
-        dependencySorter.generateDotOutput(g);
+        dependencySorter.generateDotOutput(g, "1" );
 
 
         System.out.println("\nLevel Map:");
