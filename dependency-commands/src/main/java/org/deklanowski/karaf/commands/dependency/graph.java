@@ -36,6 +36,9 @@ public class graph implements Action {
     @Option(name = "--dot", description = "Just generate simple DOT output of feature repository graph for GraphViz")
     private boolean dot;
 
+    @Option(name = "--feature", description = "Select feature graph (default is repository graph)")
+    private boolean feature;
+
     @Option(name = "--verbose", description = "Blah blah blah")
     private boolean verbose;
 
@@ -47,28 +50,35 @@ public class graph implements Action {
     @SuppressWarnings("unused")
     @Override
     public Object execute() throws Exception {
-        System.out.printf("Computing feature graph for '%s' '%s':\n", name, (version == null ? "0.0.0" : version));
+
+        if (verbose) {
+            System.out.printf("Computing feature graph for '%s' '%s':\n", name, (version == null ? "0.0.0" : version));
+        }
+
 
         buildFeatureGraph(featuresService, name, version);
 
 
-        final DependencySorter<String> dependencySorter = new DependencySorter<>(verbose);
+        if (feature) {
+            final DependencySorter<Node> sorter = new DependencySorter<>(verbose);
+            final List<Node> list = sorter.sort(featureGraph);
 
-        final List<String> list = dependencySorter.sort(repoGraph);
+            if (dot) {
+                sorter.generateDotOutput(featureGraph);
+            } else {
+                sorter.displayDependencyLevels();
+            }
 
-        Map<Integer, Set<String>> levelMap = dependencySorter.getLevelMap();
+        } else {
+            final DependencySorter<String> sorter = new DependencySorter<>(verbose);
+            final List<String> list = sorter.sort(repoGraph);
 
-
-        if (dot) {
-            generateDotOutput(repoGraph, levelMap);
-            return null;
+            if (dot) {
+                sorter.generateDotOutput(repoGraph);
+            } else {
+                sorter.displayDependencyLevels();
+            }
         }
-
-
-        for (Map.Entry<Integer,Set<String>> entry : levelMap.entrySet()) {
-            System.out.printf("%d -> %s\n",entry.getKey(),entry.getValue());
-        }
-
 
 
         return null;
@@ -76,45 +86,6 @@ public class graph implements Action {
     }
 
 
-    /**
-     * Simple DOT output for visualisation
-     * @param <T> node type
-     * @param graph the graph instance
-     * @param levelMap
-     */
-    private <T> void generateDotOutput(Graph<T> graph, Map<Integer,Set<String>> levelMap) {
-        System.out.println("digraph G {\ngraph [style=\"rounded, filled\", fontsize=10];\nrankdir=LR;\nnode [shape=box, style=\"rounded,filled\"]\n\n");
-
-        for (Set<String> nodes : levelMap.values()) {
-            for (String node : nodes) {
-                if (node.contains("com.ipfli")) {
-                    System.out.printf("\"%s\" [ color=darkseagreen ];\n", node);
-                }
-            }
-        }
-
-        System.out.println();
-
-        // group levels in a subgraph
-        for (Map.Entry<Integer,Set<String>> entry : levelMap.entrySet()) {
-            System.out.printf("\tsubgraph cluster_%d { label=\"Level %d\"; shape=box; style=rounded; node [style=rounded];\n",entry.getKey(),entry.getKey());
-            int i=0;
-            Set<String> nodes = entry.getValue();
-            for (String node : nodes) {
-                System.out.printf("\"%s\"",node);
-                i++;
-                if (i < nodes.size()) {
-                    System.out.print(",");
-                }
-            }
-            System.out.println("}\n");
-        }
-
-        for (EndpointPair<T> pair : graph.edges()) {
-            System.out.printf("\t\"%s\" -> \"%s\";\n",pair.source(), pair.target());
-        }
-        System.out.println("}");
-    }
 
 
     /**
@@ -144,8 +115,6 @@ public class graph implements Action {
         this.name = name;
     }
 
-    private static final AtomicLong id = new AtomicLong(0);
-
     /**
      * Builds a dependency graph of features starting with the specified root feature.
      *
@@ -166,7 +135,7 @@ public class graph implements Action {
                 String fromRepo = feature.getRepositoryUrl();
 
                 if (StringUtils.isBlank(fromRepo)) {
-                    throw new IllegalStateException(String.format("Repository URL for source %s is empty",feature));
+                    throw new IllegalStateException(String.format("Repository URL for source %s is empty", feature));
                 }
 
                 Node from = new Node(featureName, fromRepo);
@@ -176,25 +145,37 @@ public class graph implements Action {
                 Feature df = service.getFeature(toName, dependency.getVersion());
 
                 if (df == null) {
-                    throw new IllegalStateException(String.format("Could not resolve feature for %s, you might need to update your local maven repository",dependency));
+                    throw new IllegalStateException(String.format("Could not resolve feature for %s, you might need to update your local maven repository", dependency));
                 }
 
                 String toRepo = df.getRepositoryUrl();
 
                 if (StringUtils.isBlank(fromRepo)) {
-                    throw new IllegalStateException(String.format("Repository URL for target %s is empty",feature));
+                    throw new IllegalStateException(String.format("Repository URL for target %s is empty", feature));
                 }
 
 
                 Node to = new Node(toName, toRepo);
 
                 featureGraph.putEdge(from, to);
+                if (verbose) {
+                    System.out.printf("Adding edge to feature graph %s -> %s\n", from, to);
+                }
+
                 if (Graphs.hasCycle(featureGraph)) {
                     throw new IllegalStateException(String.format("Circular dependency detected while adding edge '%s' -> '%s', aborting\n", featureName, toName));
                 }
 
                 if (!fromRepo.equals(toRepo)) {
-                    repoGraph.putEdge(compactRepoUrl(fromRepo), compactRepoUrl(toRepo));
+
+                    String nodeU = compactRepoUrl(fromRepo);
+                    String nodeV = compactRepoUrl(toRepo);
+
+                    if (verbose) {
+                        System.out.printf("Adding edge to feature repository graph %s -> %s\n", nodeU, nodeV);
+                    }
+
+                    repoGraph.putEdge(nodeU, nodeV);
                     if (Graphs.hasCycle(repoGraph)) {
                         throw new IllegalStateException(String.format("Circular dependency detected while adding edge '%s' -> '%s', aborting\n", fromRepo, toRepo));
                     }
@@ -208,11 +189,12 @@ public class graph implements Action {
 
     /**
      * Strip out unnecessary text for better readability
+     *
      * @param repoUrl feature repository URL
      * @return shortened form
      */
     private String compactRepoUrl(String repoUrl) {
-        return repoUrl.replace("mvn:","").replace("/xml/features","");
+        return repoUrl.replace("mvn:", "").replace("/xml/features", "");
     }
 
 

@@ -5,21 +5,22 @@ import com.google.common.graph.*;
 import com.google.common.graph.Graph;
 
 import java.util.*;
+import java.util.stream.Collectors;
 
 /**
  * This uses a BFS topological sort with graph depth tracking to sort dependencies into
  * levels. Levels identify those sets of dependencies that can be independently handled.
- *
+ * <p>
  * The BFS algorithm is according to Kahn (1962)
- *
+ * <p>
  * The slick solution to graph depth/level tracking courtesy of
  * https://stackoverflow.com/questions/31247634/how-to-keep-track-of-depth-in-breadth-first-search/31248992#31248992
- *
+ * <p>
  * I use {@link Graph}, the input graph instance must be a DAG.
  *
+ * @param <T>
  * @author deklanowski
  * @since June 2017
- * @param <T>
  */
 public class DependencySorter<T> {
 
@@ -117,7 +118,7 @@ public class DependencySorter<T> {
 
                 int degree = nodeDegree.get(successor);
 
-                nodeDegree.put(successor, (degree == 0 ? 0 : degree-1));
+                nodeDegree.put(successor, (degree == 0 ? 0 : degree - 1));
 
                 if (shouldAddToQueue(degree)) {
                     if (verbose) {
@@ -129,11 +130,32 @@ public class DependencySorter<T> {
             }
         }
 
+
+        Set<T> bottomFeeders = new HashSet<>();
+
+        for (Map.Entry<Integer, Set<T>> entry : levelMap.entrySet()) {
+            Iterator<T> nodeIter = entry.getValue().iterator();
+            while (nodeIter.hasNext()) {
+                T node = nodeIter.next();
+                if (graph.successors(node).isEmpty()) {
+                    bottomFeeders.add(node);
+                    nodeIter.remove();
+                }
+            }
+
+        }
+
+        System.out.println("Bottom feeders: " + bottomFeeders);
+
+        bottomFeeders.addAll(levelMap.get(levelMap.size()));
+        levelMap.put(levelMap.size(), bottomFeeders);
+
         return result;
     }
 
     /**
      * Add nodes to level map, remove marker nulls.
+     *
      * @param level graph depth
      * @param queue current node queue
      */
@@ -147,11 +169,13 @@ public class DependencySorter<T> {
     /**
      * Call this directly after {@link #sort(Graph)} to get level view of
      * nodes.
+     *
      * @return level to nodes map
      */
     public Map<Integer, Set<T>> getLevelMap() {
         return this.levelMap;
     }
+
 
     /**
      * @param inDegree the degree of the node being processed
@@ -160,6 +184,61 @@ public class DependencySorter<T> {
     private boolean shouldAddToQueue(int inDegree) {
         return (inDegree - 1) == 0;
     }
+
+
+    /**
+     * Print out node levels
+     * @param <T> node type
+     */
+    public <T> void displayDependencyLevels() {
+        this.levelMap.forEach((k,v)->System.out.println(k + " -> " + v));
+    }
+
+
+    /**
+     * Simple DOT output for visualisation
+     *
+     * @param <T>   node type
+     * @param graph the graph instance
+     */
+    @SuppressWarnings("unchecked")
+    public <T> void generateDotOutput(Graph<T> graph) {
+
+        System.out.println("digraph G {\ngraph [style=\"rounded, filled\", fontsize=10];\nrankdir=LR;\nnode [shape=box, style=\"rounded,filled\"]\n\n");
+
+
+        Set<T> nodes = (Set<T>) levelMap.values()
+                .stream()
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+
+
+        nodes
+                .stream()
+                .filter(node -> node.toString().contains("com.ipfli"))
+                .forEach(node -> System.out.printf("\"%s\" [ color=darkseagreen ];\n", node));
+
+
+        System.out.println();
+
+
+        // group levels in a subgraph
+        for (Integer level : this.levelMap.keySet()) {
+            System.out.printf("\tsubgraph cluster_%d { label=\"Level %d\"; shape=box; style=rounded; node [style=rounded];\n", level, level);
+            Set<T> levelNodes = (Set<T>)levelMap.get(level);
+            for (T node : levelNodes) {
+                System.out.printf("\"%s\" ", node);
+            }
+            System.out.println("}\n");
+        }
+
+        for (EndpointPair<T> pair : graph.edges()) {
+            System.out.printf("\t\"%s\" -> \"%s\";\n", pair.source(), pair.target());
+        }
+        System.out.println("}");
+    }
+
+
 
 
     public static void main(String[] args) {
@@ -191,29 +270,16 @@ public class DependencySorter<T> {
         System.out.println();
 
 
-        // debug
-        generateDotOutput(g);
+        dependencySorter.generateDotOutput(g);
 
 
         System.out.println("\nLevel Map:");
 
-        for (Map.Entry<Integer,Set<Integer>> entry : dependencySorter.getLevelMap().entrySet()) {
-            System.out.printf("%d -> %s\n",entry.getKey(),entry.getValue());
+        for (Map.Entry<Integer, Set<Integer>> entry : dependencySorter.getLevelMap().entrySet()) {
+            System.out.printf("%d -> %s\n", entry.getKey(), entry.getValue());
         }
     }
 
 
-    /**
-     * Simple DOT output for GraphViz. Paste this into http://www.webgraphviz.com/
-     * to help you confirm the algorithm.
-     * @param g the graph instance.
-     */
-    private static void generateDotOutput(MutableGraph<Integer> g) {
-        System.out.println("digraph G {");
-        for (EndpointPair<Integer> pair : g.edges()) {
-            System.out.printf("\t%d -> %d;\n",pair.source(),pair.target());
-        }
-        System.out.println("}");
-    }
 }
 
