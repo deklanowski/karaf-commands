@@ -14,7 +14,9 @@ import java.lang.reflect.Field;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.regex.Pattern;
 
+import static java.util.regex.Pattern.compile;
 import static org.mockito.Mockito.when;
 
 @RunWith(MockitoJUnitRunner.class)
@@ -106,10 +108,11 @@ public class GraphCommandTest {
     }
 
     @Test
-    public void name() throws Exception {
-        String url = "mvn:com.ipfli.ipf.target-manager/features/4.1.5-SNAPSHOT/xml/features";
+    public void test_name() throws Exception {
+        Pattern compile = compile("org\\.apache|org\\.code-house|org\\.deklanowski");
 
-        System.out.println(url.replace("mvn:","").replace("/xml/features",""));
+        System.out.println(compile.matcher("com.ipfli.ipf.security/features/4.1.0").find());
+
     }
 
     @Test(expected = IllegalStateException.class)

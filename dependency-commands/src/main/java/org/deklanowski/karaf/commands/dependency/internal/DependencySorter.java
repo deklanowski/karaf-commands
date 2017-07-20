@@ -3,9 +3,13 @@ package org.deklanowski.karaf.commands.dependency.internal;
 import com.google.common.base.Preconditions;
 import com.google.common.graph.*;
 import com.google.common.graph.Graph;
+import org.apache.commons.lang3.StringUtils;
 
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
+
+import static java.util.regex.Pattern.compile;
 
 /**
  * This uses a BFS topological sort with graph depth tracking to sort dependencies into
@@ -36,11 +40,18 @@ public class DependencySorter<T> {
     private final boolean verbose;
 
 
+    /** Patterns to determine nodes which should be placed in the bottom-most dependency level */
+    private final Pattern excludePattern;
+
+
     public DependencySorter() {
         this.verbose = false;
+        this.excludePattern = compile("org\\.apache|org\\.code-house|org\\.deklanowski");
     }
 
-    public DependencySorter(boolean verbose) {
+    public DependencySorter(String excludePattern, boolean verbose) {
+        excludePattern = Preconditions.checkNotNull(excludePattern, "exclude pattern should be a non-empty string");
+        this.excludePattern = compile(excludePattern);
         this.verbose = verbose;
     }
 
@@ -132,9 +143,6 @@ public class DependencySorter<T> {
         }
 
 
-
-
-
         // find all nodes with no successors, these can be moved to the bottom-most level
         // regardless of what their original computed level is.
         //
@@ -144,12 +152,13 @@ public class DependencySorter<T> {
             Iterator<T> nodeIter = entry.getValue().iterator();
             while (nodeIter.hasNext()) {
                 T node = nodeIter.next();
-                if (graph.successors(node).isEmpty()) {
+                if (isBottomFeeder(graph, node)) {
                     bottomFeeders.add(node);
                     nodeIter.remove();
                 }
             }
         }
+
 
         if (verbose) {
             System.out.println("Bottom feeders: " + bottomFeeders);
@@ -159,6 +168,34 @@ public class DependencySorter<T> {
         levelMap.put(levelMap.size(), bottomFeeders);
 
         return result;
+    }
+
+
+    /**
+     * Nodes which match the following criteria are bottom feeders:
+     * 1. no children
+     * 2. node name matches the exclude pattern
+     * 3. only have children whose names match the exclude pattern
+     *
+     * {@link #excludePattern}
+     * @param graph the graph
+     * @param node node to test
+     * @return true if bottom feeders
+     */
+    private boolean isBottomFeeder(Graph<T> graph, T node) {
+        Set<T> successors = graph.successors(node);
+
+        if (successors.isEmpty()) {
+            return true;
+        } else if (excludePattern.matcher(node.toString()).find()) {
+            return true;
+        } else for (T successor : successors) {
+            if (!excludePattern.matcher(successor.toString()).find()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -185,23 +222,28 @@ public class DependencySorter<T> {
 
     /**
      * Print out node levels
+     *
      * @param <T> node type
      */
     public <T> void displayDependencyLevels() {
-        this.levelMap.forEach((k,v)->System.out.println(k + " -> " + v));
+        this.levelMap.forEach((k, v) -> System.out.println(k + " -> " + v));
     }
 
 
     /**
      * Simple DOT output for visualisation
-     *  @param <T>   node type
-     * @param graph the graph instance
+     *
+     * @param <T>         node type
+     * @param graph       the graph instance
      * @param nodePattern a simple filter to identify certain nodes for styling actions
      */
     @SuppressWarnings("unchecked")
     public <T> void generateDotOutput(Graph<T> graph, String nodePattern) {
 
-        System.out.println("digraph G {\ngraph [style=\"rounded, filled\", fontsize=10];\nrankdir=LR;\nnode [shape=box, style=\"rounded,filled\"]\n\n");
+        System.out.println("digraph G {\ngraph [style=\"rounded, filled\", fontsize=10];\nrankdir=LR;\nconcentrate=true;\nnode [shape=box, style=\"rounded,filled\"]\n\n");
+
+
+        Pattern nodePatternRegex = compile(nodePattern);
 
 
         Set<T> nodes = (Set<T>) levelMap.values()
@@ -212,8 +254,8 @@ public class DependencySorter<T> {
 
         nodes
                 .stream()
-                .filter(node -> node.toString().contains(nodePattern))
-                .forEach(node -> System.out.printf("\"%s\" [ color=darkseagreen ];\n", node));
+                .filter(node -> nodePatternRegex.matcher(node.toString()).find())
+                .forEach(node -> System.out.printf("\"%s\" [ color=khaki3 ];\n", node));
 
 
         System.out.println();
@@ -223,52 +265,49 @@ public class DependencySorter<T> {
         for (Integer level : this.levelMap.keySet()) {
             System.out.printf("\tsubgraph cluster_%d { label=\"Level %d\"; shape=box; style=rounded; node [style=rounded];\n", level, level);
 
-            Set<T> levelNodes = (Set<T>)levelMap.get(level);
-            for (T node : levelNodes) {
-                System.out.printf("\"%s\" ", node);
-            }
+            levelMap.get(level)
+                    .forEach(node -> System.out.printf("\"%s\" ", node));
+
             System.out.println("}\n");
         }
 
-        for (EndpointPair<T> pair : graph.edges()) {
-            System.out.printf("\t\"%s\" -> \"%s\";\n", pair.source(), pair.target());
-        }
+        graph.edges()
+                .forEach(pair -> System.out.printf("\t\"%s\" -> \"%s\";\n", pair.source(), pair.target()));
+
         System.out.println("}");
     }
 
 
-
-
     public static void main(String[] args) {
-        final MutableGraph<Integer> g = GraphBuilder.directed().allowsSelfLoops(false).build();
+        final MutableGraph<String> g = GraphBuilder.directed().allowsSelfLoops(false).build();
 
 
-        g.putEdge(1, 2);
-        g.putEdge(1, 3);
-        g.putEdge(2, 4);
-        g.putEdge(2, 5);
-        g.putEdge(3, 6);
-        g.putEdge(3, 7);
-        g.putEdge(1, 7);
-        g.putEdge(2, 7);
-        g.putEdge(8, 3);
-        g.putEdge(8, 5);
-        g.putEdge(8, 9);
-        g.putEdge(9, 10);
-        g.putEdge(10, 11);
-        g.putEdge(6, 12);
-        g.putEdge(11, 6);
+        g.putEdge("com.example.A", "com.example.B");
+        g.putEdge("com.example.A", "com.example.C");
+        g.putEdge("com.example.A", "org.code-house");
+
+        g.putEdge("com.example.B", "com.example.D");
+        g.putEdge("com.example.B", "com.example.E");
+
+        g.putEdge("com.example.C", "com.example.F");
+        g.putEdge("com.example.C", "com.example.G");
+        g.putEdge("com.example.F", "org.apache.B");
+
+        g.putEdge("com.example.C", "org.deklanowski.A");
+        g.putEdge("com.example.C", "org.apache.B");
+
+        g.putEdge("org.apache.B", "org.apache.C");
 
 
-        DependencySorter<Integer> dependencySorter = new DependencySorter<>(true);
-        List<Integer> list = dependencySorter.sort(g);
+        DependencySorter<String> dependencySorter = new DependencySorter<>();
+        List<String> list = dependencySorter.sort(g);
 
         System.out.println("Topologically sorted, for dependency build order reverse the list");
         System.out.println(list);
         System.out.println();
 
 
-        dependencySorter.generateDotOutput(g, "1" );
+        dependencySorter.generateDotOutput(g, "com.example|org.deklan");
 
 
         System.out.println("\nLevel Map:");

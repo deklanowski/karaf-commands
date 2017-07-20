@@ -39,8 +39,12 @@ public class graph implements Action {
     @Option(name = "--verbose", description = "Blah blah blah")
     private boolean verbose;
 
-    @Option(name = "--nodePattern", description = "Simple string matcher for node names for the application of styling actions in DOT output")
-    private String nodePattern;
+    @Option(name = "--nodePattern", description = "Simple regex string matcher for node names for the application of styling actions in DOT output")
+    private String nodePattern="";
+
+
+    @Option(name = "--excludePattern", description = "Simple regex string matcher for node names which should be considered as external or third party, these will be collected in the bottom-most dependency bucket")
+    private String excludePattern="";
 
 
     private final MutableGraph<Node> featureGraph = GraphBuilder.directed().allowsSelfLoops(false).build();
@@ -59,7 +63,7 @@ public class graph implements Action {
         buildFeatureGraph(featuresService, name, version);
 
         if (feature) {
-            final DependencySorter<Node> sorter = new DependencySorter<>(verbose);
+            final DependencySorter<Node> sorter = new DependencySorter<>(excludePattern, verbose);
             final List<Node> list = sorter.sort(featureGraph);
 
             if (dot) {
@@ -69,7 +73,7 @@ public class graph implements Action {
             }
 
         } else {
-            final DependencySorter<String> sorter = new DependencySorter<>(verbose);
+            final DependencySorter<String> sorter = new DependencySorter<>(excludePattern, verbose);
             final List<String> list = sorter.sort(repoGraph);
 
             if (dot) {
